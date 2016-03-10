@@ -2,7 +2,7 @@
  * http_abstraction.h
  *
  * Created on: 1 mars 2016
- * Author: Juan
+ * @author: Zekemyapp
  *
  * This library is created to abstract the ESP Driver specific command using
  * a more generalized calls that can then be used by other libs

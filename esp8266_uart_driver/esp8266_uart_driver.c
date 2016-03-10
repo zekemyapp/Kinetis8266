@@ -1,8 +1,8 @@
 /*
  * esp8266_uart_driver.c
  *
- *  Created on: 2 févr. 2016
- *      Author: Juan
+ * Created on: 2 févr. 2016
+ * @author: Zekemyapp
  */
 
 

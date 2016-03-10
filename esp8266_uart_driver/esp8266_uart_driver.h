@@ -1,8 +1,8 @@
 /*
  * esp8266_uart_driver.h
  *
- *  Created on: 2 févr. 2016
- *      Author: Juan
+ * Created on: 2 févr. 2016
+ * @author: Zekemyapp
  */
 
 #ifndef ESP8266_UART_DRIVER_ESP8266_UART_DRIVER_H_
