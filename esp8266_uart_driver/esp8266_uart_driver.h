@@ -197,7 +197,7 @@ void ESP8266_UART_IPSTATUS();
 bool ESP8266_UART_IPSEND_HEADER(kwifi_socket_t socket, uint16_t length);
 
 
-uint16_t ESP8266_UART_IPSEND_BODY(const uint8_t* body, char* buffer, uint16_t size);
+uint16_t ESP8266_UART_IPSEND_BODY(uint8_t* body, uint8_t* buffer, uint16_t size);
 
 /*
  * Close TCP / UDP connection

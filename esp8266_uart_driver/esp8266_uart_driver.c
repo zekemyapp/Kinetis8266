@@ -87,7 +87,7 @@ bool ESP8266_UART_QAP(){
 
 	if(res !=  kStatus_UART_Success) return true;
 
-	// Receive the print of the requuest done
+	// Receive the print of the request done
 	do{
 		res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 100);
 	} while (*rxbuffer != '\n');
@@ -160,23 +160,26 @@ void ESP8266_UART_MODE(kwifi_mode_t mode){
 bool ESP8266_UART_IPSTART(kwifi_socket_t socket, kwifi_conntype_t type, const char* address, uint16_t port){
 	uart_status_t res;
 
+	// Empty the rx buffer to be sure there are not rests of previous operations
+	do{res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 100);}
+	while (res == kStatus_UART_Success);
+
+	// Sends the command
 	sprintf(txbuffer,CIPSTART,socket,type == kwifi_TCP ? "TCP" : "UDP", address, port );
 	res = UART_DRV_SendDataBlocking(ESP_UART_INSTANCE, txbuffer, strlen(txbuffer),100);
-
 	if(res !=  kStatus_UART_Success) return true;
 
-	do{
-		res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 1000);
-	} while (*rxbuffer != '\n');
+	// Receive a copy of the command and ditch it
+	do{res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 1000);}
+	while (*rxbuffer != '\n');
 
-	res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 7, 1000);
-
+	// Receive the 7 first characters of the answer
+	res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 7, 10000);
 	rxbuffer[7]='\0';
 
+	// Check the answer
 	if(res !=  kStatus_UART_Success) return true;
-	else{
-		return ((strcmp(rxbuffer,"ALREADY") && strcmp(rxbuffer,"0,CONNE")) ? true : false);
-	}
+	else return ((strcmp(rxbuffer,"ALREADY") && strcmp(rxbuffer,"0,CONNE")) ? true : false);
 }
 
 /*
@@ -230,27 +233,30 @@ void ESP8266_UART_IPSTATUS(){
 bool ESP8266_UART_IPSEND_HEADER(kwifi_socket_t socket, uint16_t length){
 	uart_status_t res;
 
+	// Empty the rx buffer to be sure there are not rests of previous operations
+	do{res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 100);}
+	while (res == kStatus_UART_Success);
+
+	// Sends the request
 	sprintf(txbuffer,CIPSEND,socket,length);
 	res = UART_DRV_SendDataBlocking(ESP_UART_INSTANCE, txbuffer, strlen(txbuffer),100);
-
 	if(res !=  kStatus_UART_Success) return true;
 
-	do{
-		res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 100);
-	} while (*rxbuffer != '\n');
+	// Receive copy of the request sent and ditch it
+	do{res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 100);}
+	while (*rxbuffer != '\n');
 
+	// Receive the answer
 	res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 4, 1000);
-
 	rxbuffer[4]='\0';
 
+	// Check the answer for success or link not valid
 	if(res !=  kStatus_UART_Success) return true;
-	else{
-		return (strcmp(rxbuffer,"\r\nOK") ? true : false);
-	}
+	else return (strcmp(rxbuffer,"\r\nOK") ? true : false);
 }
 
 
-uint16_t ESP8266_UART_IPSEND_BODY(const uint8_t* body, char* buffer, uint16_t size){
+uint16_t ESP8266_UART_IPSEND_BODY(uint8_t* body, uint8_t* buffer, uint16_t size){
 	uart_status_t res;
 
 	bool found_1st = false;
@@ -260,11 +266,17 @@ uint16_t ESP8266_UART_IPSEND_BODY(const uint8_t* body, char* buffer, uint16_t si
 	uint16_t x = 0;
 	uint16_t y = 0;
 	uint16_t offset = 0;
-	char tmp_buf[32] = {0};
+	char tmp_buf[16] = {0};
 
+	// Empty the rx buffer to be sure there are not rests of previous operations
+	do{res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 100);}
+	while (res == kStatus_UART_Success);
+
+	// Sends the data containing the body of the http request
 	res = UART_DRV_SendDataBlocking(ESP_UART_INSTANCE, body, strlen(body),1000);
 	if(res !=  kStatus_UART_Success) return 0;
 
+	// Handle the received response from the server
 	for(;;){
 		res = UART_DRV_ReceiveDataBlocking(ESP_UART_INSTANCE, rxbuffer, 1, 2000);
 		if(res !=  kStatus_UART_Success) break;
@@ -291,13 +303,22 @@ uint16_t ESP8266_UART_IPSEND_BODY(const uint8_t* body, char* buffer, uint16_t si
 			if(x < y) continue;
 			else{
 				check_for_more = true;
+				continue;
 			}
 		}
 
 		if(found_2nd){
 			if(*rxbuffer == ':'){
-				tmp_buf[y] = '\0';
-				sscanf(tmp_buf,"%*6s%u",(unsigned int*)&y);
+				uint16_t size_descriptor = y;
+				uint8_t count;
+
+				// Decodes the number of chars to receive
+				y = 0;
+				for(count=0;count<size_descriptor-6;count++){
+					y*=10;
+					y+=tmp_buf[count+6]-'0';
+				}
+
 				y += offset;
 				if (y+1>size) return 0;
 

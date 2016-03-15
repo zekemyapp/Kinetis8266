@@ -29,6 +29,7 @@
 
 #define HTTP_SOCKET_NUMBER 	5 // The ESP8266 Can handle up to 5 connection at the same time
 #define MAX_PAYLOAD_SIZE 	300
+#define MAX_RETRY			10
 
 typedef enum {
 	httpGet,

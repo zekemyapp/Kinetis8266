@@ -33,6 +33,8 @@ static kwifi_socket_t request_socket (void){
  */
 http_error_t HTTP_Request (http_request_t* request, uint8_t* buffer, uint16_t size){
 	kwifi_socket_t socket;
+	uint8_t loop_count;
+
 	if( (socket=request_socket()) >= HTTP_SOCKET_NUMBER) return httpBussy;
 	sockets[socket] = request;
 
@@ -59,8 +61,19 @@ http_error_t HTTP_Request (http_request_t* request, uint8_t* buffer, uint16_t si
 					"\r\n"
 					"%s",type, request->path,request->header,strlen(request->body),request->body);
 
-	while(ESP8266_UART_IPSTART(socket, kwifi_TCP, request->host, request->port));
-	while(ESP8266_UART_IPSEND_HEADER(socket, strlen(payload)));
+	loop_count = 0;
+	while(ESP8266_UART_IPSTART(socket, kwifi_TCP, request->host, request->port) && loop_count < MAX_RETRY) loop_count +=1;
+	if (loop_count >= MAX_RETRY){
+		sockets[socket] = 0;
+		return httpRequestError;
+	}
+
+	loop_count = 0;
+	while(ESP8266_UART_IPSEND_HEADER(socket, strlen(payload)) && loop_count < MAX_RETRY) loop_count +=1;
+	if (loop_count >= MAX_RETRY){
+		sockets[socket] = 0;
+		return httpRequestError;
+	}
 
 	uint16_t size_test;
 	size_test = ESP8266_UART_IPSEND_BODY(payload,buffer,size);
